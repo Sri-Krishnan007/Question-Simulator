@@ -1,7 +1,8 @@
 flask
 flask-socketio
-pymongo
+pymongo[srv]
 python-dotenv
 groq
 gunicorn
 eventlet
+dnspython
