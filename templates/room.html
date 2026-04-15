@@ -1,0 +1,220 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="glass-panel" style="max-width: 800px; margin: 0 auto; text-align: center;">
+    <div>
+        <p style="text-transform: uppercase; letter-spacing: 2px; color: var(--primary-dim);">Room Code</p>
+        <h2 style="font-size: 4rem; color: var(--primary); letter-spacing: 5px; margin-bottom: 2rem;">{{ room.room_code }}</h2>
+    </div>
+
+    <!-- Players Hub -->
+    <div style="display: flex; justify-content: space-around; background: rgba(0,0,0,0.4); padding: 2rem; border-radius: 10px; margin-bottom: 2rem;">
+        <div>
+            <h3 style="color: var(--text-light); margin-bottom: 0.5rem;">Player 1</h3>
+            <p id="player1-name" style="font-size: 1.2rem; font-weight: bold; color: var(--primary);">{{ room.host }}</p>
+        </div>
+        <div>
+            <h3 style="color: var(--text-light); margin-bottom: 0.5rem;">Player 2</h3>
+            <p id="player2-name" style="font-size: 1.2rem; font-weight: bold; color: #aaa;">Waiting for opponent...</p>
+        </div>
+    </div>
+
+    <div id="game-status-msg" style="margin-bottom: 2rem; font-size: 1.1rem; color: var(--text-light);">
+        Share the code with a friend to begin.
+    </div>
+
+    <div id="host-controls" style="display: none;">
+        <button id="start-btn" class="btn btn-primary" style="width: 100%; font-size: 1.5rem;">START MATCH</button>
+    </div>
+</div>
+
+<!-- Placeholder for the game board (Hidden initially) -->
+<div id="game-board" class="glass-panel" style="display: none; max-width: 800px; margin: 2rem auto; text-align: left;">
+    <p id="question-loading-msg" style="text-align: center; font-style: italic; color: var(--primary);"></p>
+    <div id="question-area" style="display: none;">
+        
+        <!-- Timer -->
+        <div id="timer-container" style="display: none; margin-bottom: 2rem; border-left: 4px solid var(--primary); padding-left: 15px;">
+            <p style="color: var(--text-light); margin-bottom: 5px; font-size: 1.1rem;">Time Remaining: <span id="time-display" style="color: var(--primary); font-weight: bold; font-size: 1.5rem;">60</span>s</p>
+            <progress id="timer-bar" value="60" max="60" style="width: 100%; height: 12px; border-radius: 5px;"></progress>
+        </div>
+
+        <h3 id="scenario-text" style="font-size: 1.3rem; margin-bottom: 2rem; line-height: 1.5; color: var(--text-light);"></h3>
+        <div id="options-grid" style="display: grid; grid-template-columns: 1fr; gap: 1rem;"></div>
+    </div>
+    
+    <div id="results-area" style="display: none; margin-top: 2rem;"></div>
+</div>
+
+<script>
+    const socket = io();
+    const roomCode = "{{ room.room_code }}";
+    const user = "{{ user }}";
+    let isHost = ("{{ room.host }}" === user);
+
+    let timerInterval = null;
+    let roundActive = false;
+
+    socket.on('connect', () => {
+        socket.emit('join_game', { room_code: roomCode, user: user });
+    });
+
+    socket.on('player_joined', (data) => {
+        if(data.players.length > 1){
+            document.getElementById('player2-name').innerText = data.players[1];
+            document.getElementById('player2-name').style.color = "var(--primary)";
+        }
+    });
+
+    socket.on('game_ready', (data) => {
+        if (isHost) {
+            document.getElementById('host-controls').style.display = "block";
+            document.getElementById('game-status-msg').innerText = "Opponent found! Ready to begin.";
+        } else {
+            document.getElementById('game-status-msg').innerText = "Waiting for Host to start the match...";
+        }
+    });
+
+    document.getElementById('start-btn')?.addEventListener('click', () => {
+        socket.emit('start_game_request', { room_code: roomCode, user: user });
+        document.getElementById('host-controls').style.display = "none";
+    });
+
+    socket.on('game_started', (data) => {
+        document.getElementById('game-status-msg').innerText = data.message;
+        document.getElementById('game-board').style.display = "block";
+    });
+
+    socket.on('question_loading', (data) => {
+        document.getElementById('question-loading-msg').innerText = data.message;
+        document.getElementById('question-area').style.display = "none";
+    });
+
+    function startTimer() {
+        let timeLeft = 60;
+        document.getElementById('time-display').innerText = timeLeft;
+        document.getElementById('timer-bar').value = timeLeft;
+        document.getElementById('time-display').style.color = "var(--primary)";
+
+        if(timerInterval) clearInterval(timerInterval);
+        
+        timerInterval = setInterval(() => {
+            if(!roundActive) {
+                clearInterval(timerInterval);
+                return;
+            }
+            timeLeft--;
+            document.getElementById('time-display').innerText = timeLeft;
+            document.getElementById('timer-bar').value = timeLeft;
+            
+            if(timeLeft <= 10) {
+                 document.getElementById('time-display').style.color = "red";
+            }
+            
+            if(timeLeft <= 0) {
+                clearInterval(timerInterval);
+                roundActive = false;
+                // Auto submit timeout
+                socket.emit('submit_answer', { room_code: roomCode, user: user, answer: "Timeout" });
+                document.getElementById('options-grid').innerHTML = '<p style="text-align:center; color: red; font-size: 1.2rem;">Time is up! Answers locked.</p>';
+            }
+        }, 1000);
+    }
+
+    socket.on('new_question', (data) => {
+        document.getElementById('question-loading-msg').innerText = "";
+        document.getElementById('results-area').style.display = "none";
+        document.getElementById('question-area').style.display = "block";
+        document.getElementById('timer-container').style.display = "block";
+        
+        document.getElementById('scenario-text').innerText = data.scenario;
+        roundActive = true;
+        
+        const optionsGrid = document.getElementById('options-grid');
+        optionsGrid.innerHTML = '';
+        
+        for (const [key, value] of Object.entries(data.options)) {
+            const btn = document.createElement('button');
+            btn.className = "btn btn-secondary";
+            btn.style.textAlign = "left";
+            btn.innerText = `${key}: ${value}`;
+            btn.onclick = () => {
+                if(!roundActive) return;
+                roundActive = false;
+                clearInterval(timerInterval);
+                socket.emit('submit_answer', { room_code: roomCode, user: user, answer: key });
+                optionsGrid.innerHTML = '<p style="text-align:center; color: var(--primary);">Answer logged. Waiting for opponent...</p>';
+            };
+            optionsGrid.appendChild(btn);
+        }
+        
+        startTimer();
+    });
+    
+    socket.on('player_answered', (data) => {
+        if(data.user !== user) {
+            document.getElementById('game-status-msg').innerText = `${data.user} has submitted their strategy!`;
+        }
+    });
+    
+    socket.on('opponent_disconnected', (data) => {
+        roundActive = false;
+        clearInterval(timerInterval);
+        document.getElementById('question-area').style.display = "none";
+        document.getElementById('results-area').style.display = "block";
+        document.getElementById('results-area').innerHTML = `
+            <div style="background: rgba(255, 0, 0, 0.2); padding: 20px; border-radius: 8px; text-align: center;">
+                <h3 style="color: #ff4444; margin-bottom: 10px;">Alert</h3>
+                <p style="font-size: 1.2rem;">${data.message}</p>
+                <a href="/dashboard" class="btn btn-primary" style="margin-top: 20px; display: inline-block;">Return to Dashboard</a>
+            </div>
+        `;
+    });
+    
+    socket.on('round_results', (data) => {
+        roundActive = false;
+        clearInterval(timerInterval);
+        document.getElementById('timer-container').style.display = "none";
+        
+        let bottomControls = "";
+        
+        if (!data.is_final && isHost) {
+            bottomControls = `<button class="btn btn-primary" onclick="socket.emit('start_next_round', {room_code: roomCode, user: user})">Start Next Round</button>`;
+        } else if (!data.is_final && !isHost) {
+            bottomControls = `<p style="font-style: italic;">Waiting for Host to initiate next round...</p>`;
+        } else {
+            bottomControls = `<a href="/dashboard" class="btn btn-primary" style="text-decoration:none; display: inline-block;">Return to Dashboard</a>`;
+        }
+        
+        const resultHTML = `
+            <h3 style="color: var(--primary); margin-bottom: 1rem; font-size: 2rem;">Results!</h3>
+            <p style="margin-bottom: 20px; font-size: 1.1rem;">The optimal strategic theory says the best route was: <strong style="color: var(--text-light);">${data.best_option}</strong></p>
+            
+            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid var(--primary); line-height: 1.6;">
+                <strong style="color: var(--text-light);">AI Explanation:</strong><br/>
+                ${data.explanation}
+            </div>
+            
+            <h4 style="margin-bottom: 1rem; color: var(--text-light);">Scores this round:</h4>
+            <ul style="list-style: none; padding: 0; margin-bottom: 20px;">
+                ${Object.keys(data.results).map(p => `
+                    <li style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between;">
+                        <span>${p} picked <strong>${data.results[p].answer}</strong></span>
+                        <span style="color:${data.results[p].points > 0 ? 'var(--primary)' : 'red'}; font-weight: bold;">
+                            +${data.results[p].points} pts
+                            ${data.elo_change && data.elo_change[p] ? `(Elo: ${data.elo_change[p] > 0 ? '+' : ''}${Math.round(data.elo_change[p])})` : ''}
+                        </span>
+                    </li>
+                `).join('')}
+            </ul>
+            <div style="text-align: center; margin-top: 2rem;">
+                ${bottomControls}
+            </div>
+        `;
+        document.getElementById('question-area').style.display = "none";
+        document.getElementById('results-area').innerHTML = resultHTML;
+        document.getElementById('results-area').style.display = "block";
+    });
+
+</script>
+{% endblock %}

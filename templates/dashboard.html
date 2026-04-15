@@ -1,0 +1,168 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr; gap: 2rem; max-width: 900px; margin: 0 auto;">
+
+    <!-- User Stat Header -->
+    <div class="glass-panel" style="display: flex; justify-content: space-between; align-items: center; padding: 2rem;">
+        <div>
+            <h2 style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 0.5rem;">Welcome, <span style="color: var(--primary);">{{ session['user'] }}</span></h2>
+            <p>Ready to test your strategy?</p>
+        </div>
+        <div style="text-align: right;">
+            <p style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Elo Rating</p>
+            <h3 style="font-size: 3rem; color: var(--primary);">{{ user.get('elo', 1200) }}</h3>
+            <p style="font-size: 0.8rem; color: var(--text-dark);">Total Score: {{ user.get('score', 0) }}</p>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div style="background: rgba(255, 0, 0, 0.2); padding: 10px; border-radius: 5px; text-align: center; color: white;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <script>
+    function toggleCustomTopic(selectElem, customContainerId) {
+        const customDiv = document.getElementById(customContainerId);
+        const customInput = customDiv.querySelector('input');
+        if(selectElem.value === 'Other') {
+            customDiv.style.display = 'block';
+            customInput.required = true;
+        } else {
+            customDiv.style.display = 'none';
+            customInput.required = false;
+        }
+    }
+    </script>
+
+    <!-- Matchmaking Controls -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+        
+        <!-- Create Room (Multiplayer) -->
+        <div class="glass-panel" style="text-align: center;">
+            <h3 style="margin-bottom: 1rem; color: var(--text-light);">Host PvP Match</h3>
+            <p style="margin-bottom: 2rem; font-size: 0.95rem;">Create a unique code and invite a friend.</p>
+            <form method="POST" action="{{ url_for('room.create_room') }}" style="display: flex; flex-direction: column; gap: 0.8rem; text-align: left;">
+                <div style="font-size: 0.9rem;">
+                    <label style="display: block; color: var(--text-main); margin-bottom: 0.3rem;">Game Concept</label>
+                    <select name="topic" onchange="toggleCustomTopic(this, 'host-custom-topic')" style="width: 100%; padding: 0.6rem; border-radius: 5px; border: 1px solid var(--primary-dim); background: rgba(0,0,0,0.5); color: white; font-family: inherit;">
+                        <option value="Prisoner's Dilemma">Prisoner's Dilemma (Trust vs Betrayal)</option>
+                        <option value="Split or Steal">Split or Steal (Game Show Logic)</option>
+                        <option value="Chicken">Game of Chicken (Who Swerves First?)</option>
+                        <option value="Ultimatum Game">Ultimatum Game (Take It or Leave It)</option>
+                        <option value="Group Project">Group Project (The Free Rider Problem)</option>
+                        <option value="Traffic Merging">Traffic Merging (Polite vs Aggressive)</option>
+                        <option value="Office Fridge">Office Fridge Etiquette (Who steals the lunch?)</option>
+                        <option value="Tragedy of the Commons">Tragedy of the Commons</option>
+                        <option value="Other">Other...</option>
+                    </select>
+                </div>
+                <!-- Custom Topic Input Hidden initially -->
+                <div id="host-custom-topic" style="font-size: 0.9rem; display: none;">
+                    <label style="display: block; color: var(--text-main); margin-bottom: 0.3rem;">Type custom topic</label>
+                    <input type="text" name="custom_topic" placeholder="e.g. Traffic merging logic" style="width: 100%; padding: 0.6rem; border-radius: 5px; border: 1px solid var(--primary-dim); background: rgba(0,0,0,0.5); color: white; font-family: inherit;">
+                </div>
+                <div style="font-size: 0.9rem;">
+                    <label style="display: block; color: var(--text-main); margin-bottom: 0.3rem;">Total Rounds</label>
+                    <input type="number" name="rounds" value="1" min="1" max="5" required style="width: 100%; padding: 0.6rem; border-radius: 5px; border: 1px solid var(--primary-dim); background: rgba(0,0,0,0.5); color: white; font-family: inherit;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">Create Room</button>
+            </form>
+        </div>
+
+        <!-- VS AI Mode -->
+        <div class="glass-panel" style="text-align: center;">
+            <h3 style="margin-bottom: 1rem; color: var(--text-light);">Play VS AI</h3>
+            <p style="margin-bottom: 2rem; font-size: 0.95rem;">Test logic individually against the Groq engine.</p>
+            <form method="POST" action="{{ url_for('room.create_ai_room') }}" style="display: flex; flex-direction: column; gap: 0.8rem; text-align: left;">
+                <div style="font-size: 0.9rem;">
+                    <label style="display: block; color: var(--text-main); margin-bottom: 0.3rem;">Game Concept</label>
+                    <select name="topic" onchange="toggleCustomTopic(this, 'ai-custom-topic')" style="width: 100%; padding: 0.6rem; border-radius: 5px; border: 1px solid var(--primary-dim); background: rgba(0,0,0,0.5); color: white; font-family: inherit;">
+                        <option value="Prisoner's Dilemma">Prisoner's Dilemma (Trust vs Betrayal)</option>
+                        <option value="Split or Steal">Split or Steal (Game Show Logic)</option>
+                        <option value="Chicken">Game of Chicken (Who Swerves First?)</option>
+                        <option value="Ultimatum Game">Ultimatum Game (Take It or Leave It)</option>
+                        <option value="Group Project">Group Project (The Free Rider Problem)</option>
+                        <option value="Traffic Merging">Traffic Merging (Polite vs Aggressive)</option>
+                        <option value="Office Fridge">Office Fridge Etiquette (Who steals the lunch?)</option>
+                        <option value="Tragedy of the Commons">Tragedy of the Commons</option>
+                        <option value="Other">Other...</option>
+                    </select>
+                </div>
+                <!-- Custom Topic Input Hidden initially -->
+                <div id="ai-custom-topic" style="font-size: 0.9rem; display: none;">
+                    <label style="display: block; color: var(--text-main); margin-bottom: 0.3rem;">Type custom topic</label>
+                    <input type="text" name="custom_topic" placeholder="e.g. AI Security dilemma" style="width: 100%; padding: 0.6rem; border-radius: 5px; border: 1px solid var(--primary-dim); background: rgba(0,0,0,0.5); color: white; font-family: inherit;">
+                </div>
+                <div style="font-size: 0.9rem;">
+                    <label style="display: block; color: var(--text-main); margin-bottom: 0.3rem;">Total Rounds</label>
+                    <input type="number" name="rounds" value="1" min="1" max="5" required style="width: 100%; padding: 0.6rem; border-radius: 5px; border: 1px solid var(--primary-dim); background: rgba(0,0,0,0.5); color: white; font-family: inherit;">
+                </div>
+                <div style="font-size: 0.9rem;">
+                    <label style="display: block; color: var(--text-main); margin-bottom: 0.3rem;">AI Persona Type</label>
+                    <select name="persona" style="width: 100%; padding: 0.6rem; border-radius: 5px; border: 1px solid var(--primary-dim); background: rgba(0,0,0,0.5); color: white; font-family: inherit;">
+                        <option value="Tit-for-Tat">Tit-for-Tat (Copies your last move)</option>
+                        <option value="Altruist">Altruist (Favors mutual cooperation)</option>
+                        <option value="Grudger">Grudger (Betray once, and it will punish you forever)</option>
+                        <option value="Perfect Rational">Perfect Rational (Always plays Nash Equilibrium)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem;">Start Logic Game</button>
+            </form>
+        </div>
+
+        <!-- Join Room -->
+        <div class="glass-panel" style="text-align: center; height: fit-content;">
+            <h3 style="margin-bottom: 1rem; color: var(--text-light);">Join Match</h3>
+            <p style="margin-bottom: 1rem; font-size: 0.95rem;">Enter a host code.</p>
+            <form method="POST" action="{{ url_for('room.join_room') }}" style="display: flex; gap: 0.5rem; justify-content: center;">
+                <input type="text" name="room_code" placeholder="Code" required style="width: 40%; padding: 0.8rem; border-radius: 5px; border: 1px solid var(--primary-dim); background: rgba(0,0,0,0.5); color: white; font-family: inherit; font-size: 1.1rem; text-align: center; text-transform: uppercase;">
+                <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Join</button>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Match History (Placeholder) -->
+    <div class="glass-panel">
+        <h3 style="margin-bottom: 1.5rem; color: var(--text-light); border-bottom: 1px solid rgba(102, 252, 241, 0.2); padding-bottom: 1rem;">Recent Matches</h3>
+        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+            <thead>
+                <tr style="color: var(--primary-dim); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <th style="padding: 10px 0;">Date</th>
+                    <th style="padding: 10px 0;">Opponent</th>
+                    <th style="padding: 10px 0;">Topic</th>
+                    <th style="padding: 10px 0;">Elo Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if history %}
+                    {% for match in history %}
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <td style="padding: 15px 0;">{{ match._id.generation_time.strftime('%Y-%m-%d') }}</td>
+                        <td style="padding: 15px 0; font-weight: bold;">
+                            {% for p in match.players %}
+                                {% if p != session['user'] %}{{ p }}{% endif %}
+                            {% endfor %}
+                            {% if match.players|length == 1 %}None{% endif %}
+                        </td>
+                        <td style="padding: 15px 0; text-transform: capitalize;">{{ match.topic }}</td>
+                        <td style="padding: 15px 0; color: {{ 'var(--primary)' if match.get('elo_change', {}).get(session['user'], 0) >= 0 else 'red' }};">
+                            {{ '+' if match.get('elo_change', {}).get(session['user'], 0) >= 0 else '' }}{{ match.get('elo_change', {}).get(session['user'], 0)|round|int }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="4" style="text-align: center; padding: 2rem 0; font-style: italic; color: #888;">No matches played yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

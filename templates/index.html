@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<section class="hero-section glass-panel fade-in">
+    <h2>Master the Art of Strategy</h2>
+    <p>Play the classic Game Theory scenario against friends or AI. Outwit your opponents, analyze optimal strategies, and climb the leaderboard.</p>
+    <div class="hero-actions">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary" style="text-decoration: none;">Login to Play</a>
+        <a href="{{ url_for('auth.signup') }}" class="btn btn-secondary" style="text-decoration: none;">Create Account</a>
+    </div>
+</section>
+{% endblock %}
